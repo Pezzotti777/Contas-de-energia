@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Importador de Contas de Energia</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f5f6fa;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            background: #fff;
+            margin: 60px auto;
+            border-radius: 16px;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.09);
+            padding: 32px;
+        }
+        h1 {
+            text-align: center;
+            color: #2463eb;
+            margin-bottom: 24px;
+        }
+        .upload-area {
+            border: 2px dashed #2463eb;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .2s;
+            background: #f1f5ff;
+        }
+        .upload-area.dragover {
+            border-color: #1e40af;
+            background: #e0e7ff;
+        }
+        #file-input {
+            display: none;
+        }
+        .btn {
+            background: #2463eb;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 14px 32px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 16px;
+            transition: background .2s;
+        }
+        .btn:disabled {
+            background: #a5b4fc;
+            cursor: not-allowed;
+        }
+        .feedback {
+            margin-top: 28px;
+            font-size: 1.07rem;
+            color: #374151;
+        }
+        .loader {
+            display: none;
+            border: 5px solid #eee;
+            border-top: 5px solid #2463eb;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            animation: spin 1s linear infinite;
+            margin: 18px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg);}
+            100% { transform: rotate(360deg);}
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Importador de Contas de Energia</h1>
+        <form id="upload-form" enctype="multipart/form-data">
+            <label class="upload-area" id="upload-area" for="file-input">
+                <span id="file-label">Clique aqui ou arraste múltiplos PDFs</span>
+                <input type="file" id="file-input" name="pdfs" accept=".pdf" multiple>
+            </label>
+            <button class="btn" type="submit" id="import-btn" disabled>Importar para Planilha</button>
+            <div class="loader" id="loader"></div>
+            <div class="feedback" id="feedback"></div>
+        </form>
+    </div>
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const fileLabel = document.getElementById('file-label');
+        const importBtn = document.getElementById('import-btn');
+        const feedback = document.getElementById('feedback');
+        const loader = document.getElementById('loader');
+        const uploadArea = document.getElementById('upload-area');
+
+        // Atualiza o texto da área de upload
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                fileLabel.textContent = fileInput.files.length === 1
+                    ? fileInput.files[0].name
+                    : fileInput.files.length + ' arquivos selecionados';
+                importBtn.disabled = false;
+            } else {
+                fileLabel.textContent = "Clique aqui ou arraste múltiplos PDFs";
+                importBtn.disabled = true;
+            }
+        });
+
+        // Drag & drop visual feedback
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(new Event('change'));
+            uploadArea.classList.remove('dragover');
+        });
+
+        // Envio do formulário
+        document.getElementById('upload-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            loader.style.display = 'block';
+            feedback.textContent = '';
+            importBtn.disabled = true;
+
+            // ENVIO AGORA PARA O FLASK NA PORTA 5000
+            const formData = new FormData();
+            for (const file of fileInput.files) {
+                formData.append('pdfs', file);
+            }
+            try {
+                const resp = await fetch('http://127.0.0.1:5000/importar', { // <-- ALTERAÇÃO AQUI
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    feedback.textContent = 'Importação realizada com sucesso!';
+                    feedback.style.color = '#22c55e';
+                } else {
+                    feedback.textContent = 'Erro na importação: ' + (result.error || 'Verifique os arquivos enviados.');
+                    feedback.style.color = '#e11d48';
+                }
+            } catch (error) {
+                feedback.textContent = 'Erro de conexão com o servidor.';
+                feedback.style.color = '#e11d48';
+            }
+            loader.style.display = 'none';
+            importBtn.disabled = false;
+        });
+    </script>
+</body>
+</html>
